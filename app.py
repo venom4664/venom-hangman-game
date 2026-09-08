@@ -35,7 +35,7 @@ WORD_BANK = {
     ],
     "Animals": [
         "elephant", "giraffe", "dolphin", "penguin",
-        "cheetah", "octopus", "tiger", "dog"
+        "cheetah", "octopus", "tiger", "dog", "cat", "kangaroo"
     ],
     "Programming": [
         "python", "developer", "variable", "function",

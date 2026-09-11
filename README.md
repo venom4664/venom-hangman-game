@@ -110,10 +110,10 @@ venom-hangman-game/
     └── lose_laugh.mp3
 ```
 
-## 🔮 Future Levels
+## 🔮 Villain Character 
 
 <div align="center">
-<img src="docs/media/future-levels.png" alt="Roadmap" width="100%"/>
+<img src="assets/venom_character.png" alt="Roadmap" width="25%"/>
 </div>
 
 ## 🤝 Contributing
@@ -128,6 +128,7 @@ Distributed under the MIT License. See [LICENSE](LICENSE) for details.
 
 **Ahadu Gebresenbet**
 GitHub: [@venom4664](https://github.com/venom4664)
+
 Live game: https://venom-hangman-game.streamlit.app/
 
 <div align="center">

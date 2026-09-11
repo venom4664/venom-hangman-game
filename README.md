@@ -28,22 +28,22 @@
 
 ## 🖥️ Screenshots
 
-| Gameplay | Category Select | Sidebar | Stats | 
-|---|---|---|---|
+| Gameplay                                | Category Select                    | Sidebar                        | Stats                                  |
+| --------------------------------------- | ---------------------------------- | ------------------------------ | -------------------------------------- |
 | ![Gameplay](assets/venom_character.png) | ![Category](assets/green_city.png) | ![Sidebar](assets/sidebar.png) | ![Stats](assets/hanging_character.png) |
 
 <sub>Swap these for real in-app screenshots when you have them — current images are placeholders from `assets/`.</sub>
 
 ## 🛠️ Tech Stack
 
-| Layer | Technology |
-|---|---|
-| App framework | [Streamlit](https://streamlit.io/) |
-| Language | Python 3.10+ |
-| Styling | Custom CSS injected via `st.markdown` |
-| Interactivity | JavaScript via `streamlit.components.v1.html` (keyboard bridge, fireworks canvas, audio playback) |
-| Audio | Procedurally synthesized WAV tones (stdlib `wave` + `struct`) for correct/wrong/win, with a real recorded clip for the loss sound |
-| Persistence | Flat local JSON file (`venom_stats.json`) — no database required |
+| Layer         | Technology                                                                                                                        |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| App framework | [Streamlit](https://streamlit.io/)                                                                                                |
+| Language      | Python 3.10+                                                                                                                      |
+| Styling       | Custom CSS injected via `st.markdown`                                                                                             |
+| Interactivity | JavaScript via `streamlit.components.v1.html` (keyboard bridge, fireworks canvas, audio playback)                                 |
+| Audio         | Procedurally synthesized WAV tones (stdlib `wave` + `struct`) for correct/wrong/win, with a real recorded clip for the loss sound |
+| Persistence   | Flat local JSON file (`venom_stats.json`) — no database required                                                                  |
 
 ## 🚀 Getting Started
 
@@ -128,6 +128,7 @@ Distributed under the MIT License. See [LICENSE](LICENSE) for details.
 
 **Ahadu Gebresenbet**
 GitHub: [@venom4664](https://github.com/venom4664)
+Live game: https://venom-hangman-game.streamlit.app/
 
 <div align="center">
 <sub>© 2026 — We are Venom. We don't lose.</sub>

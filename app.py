@@ -158,6 +158,7 @@ def _save_persistent_stats() -> None:
                     "games_won": st.session_state.games_won,
                     "current_streak": st.session_state.current_streak,
                     "best_streak": st.session_state.best_streak,
+                    "sound_on": st.session_state.sound_on,
                 }
             )
         )
@@ -279,6 +280,13 @@ SOUND_TONES = {
     # game still works if the asset is missing.
     "lose": LOSE_LAUGH_URI if LOSE_LAUGH_URI else _lose_cackle_uri(),
 }
+
+
+def toggle_sound() -> None:
+    """Flips the shared sound_on flag used by the Settings toggle
+    and the sidebar quick-toggle simultaneously."""
+    st.session_state.sound_on = not st.session_state.sound_on
+    _save_persistent_stats()
 
 
 def render_sound() -> None:
@@ -593,7 +601,7 @@ def initialize_state() -> None:
         "current_streak": persisted.get("current_streak", 0),
         "best_streak": persisted.get("best_streak", 0),
         "page": "game",
-        "sound_on": True,
+        "sound_on": persisted.get("sound_on", True),
         "sound_event": None,
     }
 
@@ -783,62 +791,45 @@ st.markdown(
         overflow-x: hidden;
     }
 
-    /* ---------- SIDEBAR HIDE / UNHIDE (mobile-first) ---------- */
-    /* The header must KEEP its sidebar toggle alive: Streamlit
-       renders the "expand sidebar" button (top-left arrow) inside
-       the header, so a fully hidden header makes an afternoon of
-       collapsed sidebars impossible to reopen (the classic "hide
-       works, unhide doesn't" bug). The header is turned into an
-       invisible, click-through overlay that floats above the page
-       — it wastes zero vertical space and only the expand arrow
-       is interactive. */
+    /* ---------- SIDEBAR HIDE / UNHIDE ---------- */
+    /* Keep the native sidebar toggle alive so a collapsed sidebar
+       can ALWAYS be reopened (hiding the whole header broke that). */
     [data-testid="stHeader"] {
         position: fixed !important;
         top: 0;
         left: 0;
         right: 0;
         width: 100%;
-        height: 0 !important;
-        min-height: 0 !important;
+        height: 48px !important;
         background: transparent !important;
         box-shadow: none !important;
         border: none !important;
         backdrop-filter: none !important;
         z-index: 99 !important;
         pointer-events: none !important;
-        overflow: visible !important;
     }
 
     [data-testid="stHeader"] [data-testid="stToolbar"] {
         background: transparent !important;
         pointer-events: none !important;
-        height: 0 !important;
+        height: 48px !important;
         min-height: 0 !important;
-        margin: 0 !important;
-        padding: 0 !important;
+        padding: 0 8px !important;
     }
 
-    /* The one thing users need: the reopen arrow when the sidebar
-       is collapsed. Everything else in the header is decorative
-       and must keep letting clicks fall through to the page. It's
-       pinned top-right so it never overlaps the centered title. */
+    /* Useless top-right clutter — gone for good. */
+    [data-testid="stHeader"] [data-testid="stAppDeployButton"],
+    [data-testid="stHeader"] [data-testid="stMainMenu"],
+    [data-testid="stHeader"] [data-testid="stStatusWidget"],
+    [data-testid="stHeader"] [data-testid="stToolbarActions"] {
+        display: none !important;
+    }
+
+    /* The native expand arrow is the ONE interactive piece. */
     [data-testid="stExpandSidebarButton"] {
         pointer-events: auto !important;
         visibility: visible !important;
-        position: fixed !important;
-        top: 8px !important;
-        right: 12px !important;
-        left: auto !important;
-        background: rgba(6,9,7,.72) !important;
-        border: 1px solid rgba(166,255,30,.35) !important;
-        border-radius: 10px !important;
         color: #A6FF1E !important;
-        width: 40px !important;
-        height: 40px !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        backdrop-filter: blur(4px);
     }
 
     #MainMenu, footer { visibility: hidden; }
@@ -1546,11 +1537,21 @@ st.markdown(
 
     /* ---------- MOBILE / RESPONSIVE ---------- */
 
-    /* Everything on the page responds to viewport width; nothing
-       gets hidden or clipped, columns that cramped crowd out are
-       allowed to wrap, and only the two "grid of tiles" sections
-       (word row + keyboard) stay on one line so the game keeps
-       working on phones. */
+    /* The two "grid of tiles" sections (word row + keyboard) are
+       declared nowrap + equal-split OUTSIDE any media query, so no
+       responsive stacking rule can EVER break them. Side-by-side
+       normal controls stack only via their own keyed containers. */
+
+    div[class*="st-key-kbd_panel"] div[data-testid="stHorizontalBlock"],
+    div[class*="st-key-word_row"] div[data-testid="stHorizontalBlock"] {
+        flex-wrap: nowrap !important;
+    }
+
+    div[class*="st-key-kbd_panel"] div[data-testid="stColumn"],
+    div[class*="st-key-word_row"] div[data-testid="stColumn"] {
+        min-width: 0 !important;
+        flex: 1 1 0 !important;
+    }
 
     @media (max-width: 720px) {
 
@@ -1631,15 +1632,12 @@ st.markdown(
             flex: 1 1 0 !important;
         }
 
-        /* Stack side-by-side controls (category/difficulty, hint /
-           give-up, category cards, settings rows) into a single
-           column so nothing gets clipped on tiny screens. */
-        div[data-testid="stHorizontalBlock"] {
-            flex-wrap: wrap !important;
-            row-gap: 10px;
-        }
-
-        div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
+        /* Stack the specific keyed control groups — and only those
+           — into a single column. The word row and keyboard are
+           scoped out by design (never matches the selectors above),
+           so they can never be broken by a blanket wrap rule again. */
+        div[class*="st-key-bottom_actions"] div[data-testid="stColumn"],
+        div[class*="st-key-cat_grid"] div[data-testid="stColumn"] {
             min-width: 100% !important;
             flex: 1 1 100% !important;
         }
@@ -1672,6 +1670,74 @@ st.markdown(
 
             .heart-full, .heart-empty { font-size: 12px; }
         }
+    }
+
+    /* ---------- STREAK FIRE ANIMATION ---------- */
+    /* A live "ablaze" pulse on the Current Streak metric whenever
+       the streak is alive — the flame icons and the number shimmer
+       together, so it reads as the venom burning hotter. */
+
+    @keyframes streak-burn {
+        0%   { text-shadow: 0 0 4px  rgba(255,140,20,.45), 0 0 10px rgba(255,80,20,.25); }
+        50%  { text-shadow: 0 0 14px rgba(255,160,30,.95), 0 0 26px rgba(255,90,20,.55); }
+        100% { text-shadow: 0 0 4px  rgba(255,140,20,.45), 0 0 10px rgba(255,80,20,.25); }
+    }
+
+    @keyframes streak-ember {
+        0%, 100% { transform: scale(1);    filter: drop-shadow(0 0 3px rgba(255,150,30,.5)); }
+        50%      { transform: scale(1.18); filter: drop-shadow(0 0 9px rgba(255,180,40,.95)); }
+    }
+
+    div[class*="st-key-streak_glow"] [data-testid="stMetricValue"] {
+        animation: streak-burn 1.4s ease-in-out infinite;
+        will-change: text-shadow, transform;
+    }
+
+    div[class*="st-key-streak_glow"] [data-testid="stMetricValue"] svg,
+    div[class*="st-key-streak_glow"] [data-testid="stMetricValue"] [data-testid="stIconMaterial"] {
+        animation: streak-ember 1.4s ease-in-out infinite;
+    }
+
+    /* ---------- SIDEBAR SOUND TOGGLE ---------- */
+    /* Custom on/off capsule — primary = sound on (venom green),
+       secondary = sound off (bloody dark). Mirrors the Settings
+       toggle 1:1 so the two can never disagree. */
+
+    div[class*="st-key-sidebar_sound"] [data-testid="stBaseButton-primary"],
+    div[class*="st-key-sidebar_sound"] button[kind="primary"] {
+        background: linear-gradient(120deg, #A6FF1E, #7fe600) !important;
+        border: none !important;
+        border-radius: 12px !important;
+        color: #04140a !important;
+        font-weight: 900 !important;
+        letter-spacing: 1.5px !important;
+        font-size: 12px !important;
+        box-shadow: 0 0 14px rgba(166,255,30,.35);
+    }
+
+    div[class*="st-key-sidebar_sound"] [data-testid="stBaseButton-primary"]:hover,
+    div[class*="st-key-sidebar_sound"] button[kind="primary"]:hover {
+        background: linear-gradient(120deg, #c2ff55, #9dff2e) !important;
+        box-shadow: 0 0 20px rgba(166,255,30,.6);
+        transform: translateY(-1px);
+    }
+
+    div[class*="st-key-sidebar_sound"] [data-testid="stBaseButton-secondary"],
+    div[class*="st-key-sidebar_sound"] button[kind="secondary"] {
+        background: linear-gradient(145deg, #2b0d10, #150606) !important;
+        border: 1px solid rgba(255,59,78,.45) !important;
+        border-radius: 12px !important;
+        color: #ff8792 !important;
+        font-weight: 900 !important;
+        letter-spacing: 1.5px !important;
+        font-size: 12px !important;
+    }
+
+    div[class*="st-key-sidebar_sound"] [data-testid="stBaseButton-secondary"]:hover,
+    div[class*="st-key-sidebar_sound"] button[kind="secondary"]:hover {
+        border-color: rgba(255,80,100,.8) !important;
+        color: #ffb3b9 !important;
+        transform: translateY(-1px);
     }
 
     </style>
@@ -1782,10 +1848,17 @@ with st.sidebar:
     st.caption(
         f":material/local_fire_department: Best streak: {st.session_state.best_streak}"
     )
-    st.caption(
-        f":material/{'volume_up' if st.session_state.sound_on else 'volume_off'}: "
-        f"Sound {'on' if st.session_state.sound_on else 'off'}"
-    )
+
+    with st.container(key="sidebar_sound"):
+        if st.button(
+            "SOUND ON" if st.session_state.sound_on else "SOUND OFF",
+            icon=":material/volume_up:" if st.session_state.sound_on else ":material/volume_off:",
+            width="stretch",
+            key="sidebar_sound_btn",
+            type="primary" if st.session_state.sound_on else "secondary",
+        ):
+            toggle_sound()
+            st.rerun()
 
     st.markdown("---")
 
@@ -1824,25 +1897,26 @@ if st.session_state.page == "category":
 
     cat_list = list(WORD_BANK.keys())
 
-    for row_start in range(0, len(cat_list), 2):
-        row_categories = cat_list[row_start:row_start + 2]
-        cols = st.columns(len(row_categories))
+    with st.container(key="cat_grid"):
+        for row_start in range(0, len(cat_list), 2):
+            row_categories = cat_list[row_start:row_start + 2]
+            cols = st.columns(len(row_categories))
 
-        for col, category in zip(cols, row_categories):
-            with col:
-                with st.container(key=f"cat_card_{category}"):
-                    icon = CATEGORY_ICONS.get(category, ":material/abc:")
-                    is_active = category == st.session_state.category
+            for col, category in zip(cols, row_categories):
+                with col:
+                    with st.container(key=f"cat_card_{category}"):
+                        icon = CATEGORY_ICONS.get(category, ":material/abc:")
+                        is_active = category == st.session_state.category
 
-                    if st.button(
-                        category.upper(),
-                        icon=icon,
-                        width="stretch",
-                        key=f"catbtn_{category}",
-                    ):
-                        start_new_game(category=category)
-                        st.session_state.page = "game"
-                        st.rerun()
+                        if st.button(
+                            category.upper(),
+                            icon=icon,
+                            width="stretch",
+                            key=f"catbtn_{category}",
+                        ):
+                            start_new_game(category=category)
+                            st.session_state.page = "game"
+                            st.rerun()
 
                     if is_active:
                         st.markdown(
@@ -1908,12 +1982,21 @@ if st.session_state.page == "stats":
                 border=True,
             )
 
-    st.metric(
-        "Current Streak",
-        st.session_state.current_streak,
-        icon=":material/timeline:",
-        border=True,
-    )
+    if st.session_state.current_streak > 0:
+        with st.container(key="streak_glow"):
+            st.metric(
+                "Current Streak",
+                st.session_state.current_streak,
+                icon=":material/local_fire_department:",
+                border=True,
+            )
+    else:
+        st.metric(
+            "Current Streak",
+            st.session_state.current_streak,
+            icon=":material/timeline:",
+            border=True,
+        )
 
     st.markdown(
         '<div class="panel-title" style="font-size:20px;">ACHIEVEMENTS</div>',
@@ -2159,30 +2242,31 @@ with st.container(key="kbd_panel"):
 
 # ---------------- BOTTOM ACTIONS ----------------
 
-action_hint, action_giveup = st.columns(2)
+with st.container(key="bottom_actions"):
+    action_hint, action_giveup = st.columns(2)
 
-with action_hint:
-    with st.container(key="btn_hint"):
-        if st.button(
-            f"💡 HINT ({st.session_state.hints_left})",
-            disabled=(
-                st.session_state.game_over
-                or st.session_state.hints_left <= 0
-            ),
-            width="stretch",
-        ):
-            use_hint()
-            st.rerun()
+    with action_hint:
+        with st.container(key="btn_hint"):
+            if st.button(
+                f"💡 HINT ({st.session_state.hints_left})",
+                disabled=(
+                    st.session_state.game_over
+                    or st.session_state.hints_left <= 0
+                ),
+                width="stretch",
+            ):
+                use_hint()
+                st.rerun()
 
-with action_giveup:
-    with st.container(key="btn_giveup"):
-        if st.button(
-            "☠ GIVE UP",
-            disabled=st.session_state.game_over,
-            width="stretch",
-        ):
-            give_up()
-            st.rerun()
+    with action_giveup:
+        with st.container(key="btn_giveup"):
+            if st.button(
+                "☠ GIVE UP",
+                disabled=st.session_state.game_over,
+                width="stretch",
+            ):
+                give_up()
+                st.rerun()
 
 
 # ---------------- PLAY AGAIN ----------------

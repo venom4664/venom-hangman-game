@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/media/banner.png" alt="Venom Hangman" width="100%"/>
+<img src="assets/arena.png" alt="Venom Hangman" width="40%"/>
 
 <br/><br/>
 

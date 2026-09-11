@@ -28,9 +28,9 @@
 
 ## 🖥️ Screenshots
 
-| Gameplay | Category Select | Stats |
-|---|---|---|
-| ![Gameplay](assets/venom_character.png) | ![Category](assets/green_city.png) | ![Stats](assets/hanging_character.png) |
+| Gameplay | Category Select | Sidebar | Stats | 
+|---|---|---|---|
+| ![Gameplay](assets/venom_character.png) | ![Category](assets/green_city.png) | ![Sidebar](assets/sidebar.png) | ![Stats](assets/hanging_character.png) |
 
 <sub>Swap these for real in-app screenshots when you have them — current images are placeholders from `assets/`.</sub>
 

@@ -21,7 +21,7 @@ st.set_page_config(
     page_title="Venom Hangman",
     page_icon= "assets/venom_head.png",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
 # ============================================================
@@ -55,10 +55,10 @@ DIFFICULTY_ATTEMPTS = {
 }
 
 CATEGORY_ICONS = {
-    "Movies": "📽️",
-    "Animals": "🐾",
-    "Programming": "💻",
-    "Countries": "🌍",
+    "Movies": ":material/movie:",
+    "Animals": ":material/pets:",
+    "Programming": ":material/terminal:",
+    "Countries": ":material/public:",
 }
 
 HINTS_PER_ROUND = 3
@@ -470,28 +470,69 @@ def render_fireworks() -> None:
 # ADVANCED FEATURE: ACHIEVEMENTS
 # ============================================================
 
-def get_achievements() -> list[str]:
-    badges = []
+ACHIEVEMENT_DEFS = [
+    # (code, label, material-icon, unlocked rule, badge color)
+    (
+        "fire",
+        "On Fire",
+        "local_fire_department",
+        lambda: st.session_state.current_streak >= 3,
+        "red",
+        "3-win streak",
+    ),
+    (
+        "slayer",
+        "Venom Slayer",
+        "shield",
+        lambda: st.session_state.current_streak >= 5,
+        "orange",
+        "5-win streak",
+    ),
+    (
+        "lethal",
+        "Lethal Protector",
+        "skull",
+        lambda: st.session_state.best_streak >= 10,
+        "violet",
+        "10-win streak",
+    ),
+    (
+        "bond",
+        "Symbiote Bond",
+        "link",
+        lambda: st.session_state.games_won >= 10,
+        "green",
+        "10 total wins",
+    ),
+    (
+        "flawless",
+        "Flawless",
+        "verified",
+        lambda: (
+            st.session_state.games_played >= 3
+            and st.session_state.games_won == st.session_state.games_played
+        ),
+        "blue",
+        "no losses yet",
+    ),
+]
 
-    if st.session_state.current_streak >= 3:
-        badges.append("🔥 On Fire — 3-win streak")
 
-    if st.session_state.current_streak >= 5:
-        badges.append("🏆 Venom Slayer — 5-win streak")
-
-    if st.session_state.best_streak >= 10:
-        badges.append("☠ Lethal Protector — 10-win streak")
-
-    if st.session_state.games_won >= 10:
-        badges.append("🧬 Symbiote Bond — 10 total wins")
-
-    if (
-        st.session_state.games_played >= 3
-        and st.session_state.games_won == st.session_state.games_played
-    ):
-        badges.append("💯 Flawless — no losses yet")
-
-    return badges
+def get_achievement_defs() -> list[dict]:
+    """Rich definitions (icon, color, unlocked/locked) so the
+    Stats page can render both earned badges and the ones still
+    locked."""
+    return [
+        {
+            "code": code,
+            "label": label,
+            "icon": icon,
+            "color": color,
+            "detail": detail,
+            "unlocked": rule(),
+        }
+        for (code, label, icon, rule, color, detail) in ACHIEVEMENT_DEFS
+    ]
 
 
 # ============================================================
@@ -669,10 +710,6 @@ def give_up() -> None:
     record_result(False)
 
 
-def toggle_sound() -> None:
-    st.session_state.sound_on = not st.session_state.sound_on
-
-
 def on_category_change() -> None:
     start_new_game(category=st.session_state.category)
 
@@ -731,7 +768,7 @@ st.markdown(
     <style>
 
     @import url(
-        'https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Nosifer&family=Inter:wght@400;500;600;700;800;900&display=swap'
+        'https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Butcherman&family=Creepster&family=Eater&family=Metal+Mania&family=Nosifer&family=Inter:wght@400;500;600;700;800;900&display=swap'
     );
 
     /* ---------- GLOBAL ---------- */
@@ -746,7 +783,64 @@ st.markdown(
         overflow-x: hidden;
     }
 
-    [data-testid="stHeader"] { display: none; }
+    /* ---------- SIDEBAR HIDE / UNHIDE (mobile-first) ---------- */
+    /* The header must KEEP its sidebar toggle alive: Streamlit
+       renders the "expand sidebar" button (top-left arrow) inside
+       the header, so a fully hidden header makes an afternoon of
+       collapsed sidebars impossible to reopen (the classic "hide
+       works, unhide doesn't" bug). The header is turned into an
+       invisible, click-through overlay that floats above the page
+       — it wastes zero vertical space and only the expand arrow
+       is interactive. */
+    [data-testid="stHeader"] {
+        position: fixed !important;
+        top: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        height: 0 !important;
+        min-height: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        border: none !important;
+        backdrop-filter: none !important;
+        z-index: 99 !important;
+        pointer-events: none !important;
+        overflow: visible !important;
+    }
+
+    [data-testid="stHeader"] [data-testid="stToolbar"] {
+        background: transparent !important;
+        pointer-events: none !important;
+        height: 0 !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    /* The one thing users need: the reopen arrow when the sidebar
+       is collapsed. Everything else in the header is decorative
+       and must keep letting clicks fall through to the page. It's
+       pinned top-right so it never overlaps the centered title. */
+    [data-testid="stExpandSidebarButton"] {
+        pointer-events: auto !important;
+        visibility: visible !important;
+        position: fixed !important;
+        top: 8px !important;
+        right: 12px !important;
+        left: auto !important;
+        background: rgba(6,9,7,.72) !important;
+        border: 1px solid rgba(166,255,30,.35) !important;
+        border-radius: 10px !important;
+        color: #A6FF1E !important;
+        width: 40px !important;
+        height: 40px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        backdrop-filter: blur(4px);
+    }
+
     #MainMenu, footer { visibility: hidden; }
 
     /* ---------- FULL-PAGE ARENA BACKGROUND ---------- */
@@ -779,11 +873,14 @@ st.markdown(
 
     /* Fit-everything: a tighter, centered column instead of a
        1500px stretch that leaves huge dead space and forces
-       extra scrolling to reach the keyboard. */
+       extra scrolling to reach the keyboard. Tight paddings keep
+       the header + HUD + keyboard fitting one screen, and nothing
+       below is ever cut off — the page simply scrolls naturally
+       if the viewport is short instead of hiding content. */
     .block-container {
-        max-width: 1040px;
-        padding-top: 10px;
-        padding-bottom: 18px;
+        max-width: 980px;
+        padding-top: 0.35rem;
+        padding-bottom: 1.25rem;
     }
 
     /* ---------- SIDEBAR ---------- */
@@ -793,15 +890,17 @@ st.markdown(
         border-right: 1px solid rgba(166,255,30,.16);
     }
 
-    section[data-testid="stSidebar"] > div { padding: 14px 12px 20px; }
+    section[data-testid="stSidebar"] > div { padding: 10px 10px 14px; }
 
     section[data-testid="stSidebar"] .stButton > button {
-        min-height: 40px;
+        min-height: 34px;
         background: linear-gradient(145deg, #12160f, #080a08) !important;
-        color: #dddddd !important;
+        color: grey !important;
         border: 1px solid rgba(255,255,255,.08) !important;
         border-radius: 10px !important;
         font-weight: 800 !important;
+        font-size: 12px !important;
+        letter-spacing: 1px;
     }
 
     section[data-testid="stSidebar"] .stButton > button:hover {
@@ -811,25 +910,26 @@ st.markdown(
     }
 
     .side-panel {
-        padding: 10px 12px;
+        padding: 8px 12px;
         border-radius: 12px;
         border: 1px solid rgba(166,255,30,.16);
         background: rgba(10,13,11,.75);
-        margin-top: 10px;
+        margin-top: 8px;
     }
 
     .small-green {
         color: #A6FF1E;
-        font-weight: 900;
-        letter-spacing: 2px;
-        font-size: 10px;
+        font-family: "Metal Mania", "Bebas Neue", sans-serif;
+        font-weight: 400;
+        letter-spacing: 3px;
+        font-size: 13px;
     }
 
     .dev-credit {
         text-align: center;
-        font-size: 9px;
+        font-size: 10px;
         letter-spacing: 1px;
-        color: #5c645c;
+        color:white;
         margin-top: 14px;
     }
 
@@ -840,22 +940,50 @@ st.markdown(
 
     /* ---------- TOP HEADER ---------- */
 
-    .app-name { text-align: center; margin-bottom: 4px; }
+    .app-name { text-align: center; margin-bottom: 6px; }
 
     .app-name h1 {
-        font-family: "Bebas Neue", sans-serif;
-        font-size: 32px;
-        letter-spacing: 4px;
+        font-family: "Eater", "Nosifer", "Bebas Neue", sans-serif;
+        font-size: 34px;
+        letter-spacing: 3px;
         margin: 0;
         color: #fff;
     }
 
     .app-name p {
         color: #9aa39c;
-        font-size: 9px;
-        letter-spacing: 3px;
-        margin-top: -2px;
+        font-family: "Metal Mania", "Bebas Neue", sans-serif;
+        font-size: 11px;
+        letter-spacing: 4px;
+        margin-top: 0;
         text-shadow: 0 1px 3px rgba(0,0,0,.8);
+    }
+
+    /* Section intros on the Category / Stats / Settings pages —
+       a themed headline instead of a plain st.subheader, in the
+       same horror lettering as the in-game "GUESS THE WORD". */
+
+    .section-title {
+        text-align: center;
+        font-family: "Creepster", "Nosifer", sans-serif;
+        color: #eafff0;
+        letter-spacing: 1px;
+        font-size: 26px;
+        margin: 4px 0 2px;
+        line-height: 1.3;
+        text-shadow:
+            0 0 6px rgba(166,255,30,.95),
+            0 0 16px rgba(166,255,30,.7),
+            0 3px 0 rgba(3,5,3,.9);
+    }
+
+    .section-hint {
+        text-align: center;
+        color: #9aa39c;
+        font-family: "Metal Mania", "Bebas Neue", sans-serif;
+        font-size: 11px;
+        letter-spacing: 3px;
+        margin-bottom: 12px;
     }
 
     /* ---------- VENOM DRIP LETTERING ---------- */
@@ -914,12 +1042,12 @@ st.markdown(
 
     .panel-title {
         text-align: center;
-        font-family: "Nosifer", "Bebas Neue", sans-serif;
+        font-family: "Creepster", "Nosifer", "Eater", sans-serif;
         color: #eafff0;
         letter-spacing: 1px;
-        font-size: 22px;
-        margin: 10px 0 10px;
-        line-height: 1.4;
+        font-size: 26px;
+        margin: 6px 0 8px;
+        line-height: 1.3;
         text-shadow:
             0 0 6px rgba(166,255,30,.95),
             0 0 16px rgba(166,255,30,.8),
@@ -961,9 +1089,9 @@ st.markdown(
         position: relative;
         border-radius: 18px;
         overflow: hidden;
-        padding: 14px 16px 10px;
-        margin: 8px 0 12px;
-        min-height: 150px;
+        padding: 10px 14px 8px;
+        margin: 4px 0 8px;
+        min-height: 116px;
         border: 1px solid rgba(166,255,30,.28);
         background: rgba(6,9,7,.52);
         backdrop-filter: blur(6px) saturate(1.1);
@@ -980,14 +1108,15 @@ st.markdown(
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 6px;
+        margin-bottom: 4px;
     }
 
     .hud-caption {
         color: #A6FF1E;
-        font-size: 10px;
-        font-weight: 900;
-        letter-spacing: 2.5px;
+        font-family: "Metal Mania", "Bebas Neue", sans-serif;
+        font-size: 13px;
+        font-weight: 400;
+        letter-spacing: 3px;
     }
 
     /* "TRIES LEFT: ❤❤❤🖤🖤" — plain text + glowing hearts, matching
@@ -1027,13 +1156,14 @@ st.markdown(
     div[class*="st-key-word_row"] .stButton > button {
         position: relative;
         z-index: 1;
-        min-height: 58px !important;
+        min-height: 52px !important;
+        padding: 0 4px !important;
         background: linear-gradient(165deg, rgba(19,26,17,.92), rgba(7,10,7,.96)) !important;
         border: 1px solid rgba(166,255,30,.38) !important;
         border-radius: 10px !important;
         color: #A6FF1E !important;
-        font-family: "Nosifer", "Bebas Neue", sans-serif !important;
-        font-size: 19px !important;
+        font-family: "Nosifer", "Creepster", sans-serif !important;
+        font-size: 18px !important;
         letter-spacing: 1px !important;
         opacity: 1 !important;
         text-shadow:
@@ -1052,11 +1182,11 @@ st.markdown(
 
     div[class*="st-key-kbd_panel"] {
         position: relative;
-        padding: 16px 10px 8px;
+        padding: 12px 8px 6px;
         border-radius: 16px;
         background: linear-gradient(165deg, rgba(13,16,12,.94), rgba(4,5,4,.97));
         border: 1px solid rgba(166,255,30,.12);
-        margin-top: 10px;
+        margin-top: 2px;
     }
 
     /* A thin row of toxic "drip" blobs along the top edge, as if
@@ -1076,7 +1206,7 @@ st.markdown(
         pointer-events: none;
     }
 
-    div[class*="st-key-kbd_row_"] { margin-bottom: 6px; }
+    div[class*="st-key-kbd_row_"] { margin-bottom: 4px; }
 
     /* All three key states below are scoped to the keyboard panel
        and keyed off Streamlit's own button `type=`, which is safe
@@ -1089,7 +1219,7 @@ st.markdown(
 
     div[class*="st-key-kbd_panel"] [data-testid="stBaseButton-secondary"],
     div[class*="st-key-kbd_panel"] button[kind="secondary"] {
-        min-height: 46px !important;
+        min-height: 40px !important;
         background:
             linear-gradient(180deg, rgba(255,255,255,.4), rgba(255,255,255,0) 45%),
             #ECEFE7 !important;
@@ -1097,7 +1227,7 @@ st.markdown(
         border: 2px solid #14170f !important;
         border-radius: 10px !important;
         font-weight: 900 !important;
-        font-size: 15px !important;
+        font-size: 14px !important;
         box-shadow: 0 3px 0 rgba(0,0,0,.4);
         transition: transform .08s ease, box-shadow .12s ease, background .12s ease;
     }
@@ -1121,7 +1251,7 @@ st.markdown(
     div[class*="st-key-kbd_panel"] [data-testid="stBaseButton-primary"],
     div[class*="st-key-kbd_panel"] button[kind="primary"] {
         position: relative;
-        min-height: 46px !important;
+        min-height: 40px !important;
         background:
             linear-gradient(180deg, rgba(255,255,255,.35), rgba(255,255,255,0) 45%),
             linear-gradient(145deg, #9dff3e, #4fa30d) !important;
@@ -1129,7 +1259,7 @@ st.markdown(
         border: none !important;
         border-radius: 10px !important;
         font-weight: 900 !important;
-        font-size: 15px !important;
+        font-size: 14px !important;
         opacity: 1 !important;
         box-shadow: 0 3px 0 rgba(0,60,0,.45), 0 0 12px rgba(166,255,30,.35);
     }
@@ -1161,13 +1291,13 @@ st.markdown(
     div[class*="st-key-kbd_panel"] [data-testid="stBaseButton-tertiary"],
     div[class*="st-key-kbd_panel"] button[kind="tertiary"] {
         position: relative;
-        min-height: 46px !important;
+        min-height: 40px !important;
         background: linear-gradient(165deg, #241417, #170c0e) !important;
         color: #8f5a60 !important;
         border: 1px solid rgba(255,59,78,.35) !important;
         border-radius: 10px !important;
         font-weight: 800 !important;
-        font-size: 15px !important;
+        font-size: 14px !important;
         opacity: 1 !important;
     }
 
@@ -1192,9 +1322,12 @@ st.markdown(
     /* ---------- ACTION BUTTONS (distinct identity per action) ---------- */
 
     div[class*="st-key-btn_hint"] .stButton > button {
-        min-height: 44px !important;
+        min-height: 40px !important;
         border-radius: 10px !important;
         font-weight: 900 !important;
+        font-family: "Bebas Neue", sans-serif !important;
+        font-size: 15px !important;
+        letter-spacing: 1px;
         background: linear-gradient(145deg, #2e2408, #14100a) !important;
         color: #ffd25a !important;
         border: 1px solid rgba(255,210,90,.45) !important;
@@ -1209,9 +1342,12 @@ st.markdown(
     }
 
     div[class*="st-key-btn_giveup"] .stButton > button {
-        min-height: 44px !important;
+        min-height: 40px !important;
         border-radius: 10px !important;
         font-weight: 900 !important;
+        font-family: "Bebas Neue", sans-serif !important;
+        font-size: 15px !important;
+        letter-spacing: 1px;
         background: linear-gradient(145deg, #2b0d10, #150606) !important;
         color: #ff8792 !important;
         border: 1px solid rgba(255,59,78,.45) !important;
@@ -1241,6 +1377,17 @@ st.markdown(
     div[class*="st-key-btn_play_again"] .stButton > button:hover {
         transform: translateY(-2px);
         box-shadow: 0 0 26px rgba(166,255,30,.55), 0 8px 0 rgba(0,0,0,.35) !important;
+    }
+
+    /* Primary "summon" actions share the grotesque Butcherman
+       lettering so the two loudest CTAs on the app speak the same
+       horror language. */
+
+    div[class*="st-key-btn_play_again"] .stButton > button,
+    div[class*="st-key-sidebar_cta"] .stButton > button {
+        font-family: "Butcherman", "Creepster", sans-serif !important;
+        letter-spacing: 2px;
+        font-size: 15px !important;
     }
 
     /* ---------- SIDEBAR CTA + NAV ---------- */
@@ -1299,9 +1446,9 @@ st.markdown(
         background: transparent !important;
         border: none !important;
         color: #ffffff !important;
-        font-family: "Bebas Neue", sans-serif !important;
-        font-size: 21px !important;
-        letter-spacing: 2px !important;
+        font-family: "Creepster", "Nosifer", sans-serif !important;
+        font-size: 24px !important;
+        letter-spacing: 1px !important;
         min-height: 58px !important;
         box-shadow: none !important;
     }
@@ -1312,9 +1459,10 @@ st.markdown(
     }
 
     .card-tag {
-        font-size: 10px;
-        font-weight: 800;
-        letter-spacing: 2px;
+        font-family: "Metal Mania", "Bebas Neue", sans-serif;
+        font-size: 11px;
+        font-weight: 400;
+        letter-spacing: 3px;
         color: #6d746e;
         margin-top: 2px;
     }
@@ -1334,9 +1482,9 @@ st.markdown(
     }
 
     .manifesto-line {
-        font-family: "Bebas Neue", sans-serif;
+        font-family: "Metal Mania", "Bebas Neue", sans-serif;
         font-size: 15px;
-        letter-spacing: 2px;
+        letter-spacing: 3px;
         color: #cfd6cf;
         line-height: 1.3;
     }
@@ -1346,38 +1494,146 @@ st.markdown(
         text-shadow: 0 0 8px rgba(166,255,30,.6);
     }
 
-    /* ---------- MOBILE ---------- */
+    /* ---------- NATIVE WIDGET RETHEME ---------- */
+    /* Keeps the few native widgets (metrics, badges, segmented
+       controls) consistent with the horror lettering without
+       rebuilding them in raw HTML. */
+
+    [data-testid="stMetricLabel"] {
+        font-family: "Metal Mania", "Bebas Neue", sans-serif !important;
+        letter-spacing: 2px !important;
+        font-size: 11px !important;
+        color: #cfd6cf !important;
+        text-transform: none;
+    }
+
+    [data-testid="stMetricValue"] {
+        font-family: "Bebas Neue", sans-serif !important;
+        font-size: 26px !important;
+        color: #eafff0 !important;
+        letter-spacing: 1px;
+    }
+
+    [data-testid="stMetricValue"] [data-testid="stIconMaterial"] {
+        color: #A6FF1E;
+    }
+
+    div[data-testid="stToggle"] label span {
+        font-family: "Bebas Neue", sans-serif !important;
+        letter-spacing: 2px;
+        font-size: 15px !important;
+    }
+
+    div[data-testid="stBaseButton-segmented_control"] {
+        font-family: "Bebas Neue", sans-serif !important;
+        letter-spacing: 1px;
+        font-size: 14px !important;
+    }
+
+    /* ---------- SETTINGS PANEL ---------- */
+
+    div[class*="st-key-settings_panel"] {
+        border: 1px solid rgba(166,255,30,.22) !important;
+        border-radius: 16px !important;
+        background: linear-gradient(165deg, rgba(17,21,16,.85), rgba(6,8,6,.92));
+        padding: 4px 6px;
+        margin-bottom: 12px;
+    }
+
+    div[class*="st-key-settings_panel"] .hud-caption {
+        margin-bottom: 2px;
+    }
+
+    /* ---------- MOBILE / RESPONSIVE ---------- */
+
+    /* Everything on the page responds to viewport width; nothing
+       gets hidden or clipped, columns that cramped crowd out are
+       allowed to wrap, and only the two "grid of tiles" sections
+       (word row + keyboard) stay on one line so the game keeps
+       working on phones. */
 
     @media (max-width: 720px) {
 
         .app-name h1 { font-size: 24px; letter-spacing: 2px; }
-        .panel-title { font-size: 16px; }
+        .app-name p { font-size: 8px; letter-spacing: 2px; }
+        .panel-title { font-size: 19px; margin: 4px 0 6px; }
+        .section-title { font-size: 22px; }
+        .section-hint { font-size: 9px; letter-spacing: 2px; }
 
-        div[class*="st-key-arena_hud"] { min-height: 110px; padding: 10px 10px 6px; }
+        div[class*="st-key-arena_hud"] {
+            min-height: 104px;
+            padding: 8px 10px 6px;
+        }
 
         div[class*="st-key-word_row"] .stButton > button {
             min-height: 40px !important;
-            font-size: 17px !important;
+            font-size: 15px !important;
         }
 
         div[class*="st-key-kbd_panel"] [data-testid^="stBaseButton-"],
         div[class*="st-key-kbd_panel"] button[kind] {
             min-height: 36px !important;
-            font-size: 11px !important;
+            font-size: 12px !important;
             border-radius: 8px !important;
+        }
+
+        div[class*="st-key-btn_hint"] .stButton > button,
+        div[class*="st-key-btn_giveup"] .stButton > button {
+            min-height: 38px !important;
+        }
+
+        /* Category + Difficulty controls stack to two full-width
+           rows on small screens so the option chips keep their
+           full labels instead of getting squeezed. */
+        div[class*="st-key-top_controls"] div[data-testid="stColumn"] {
+            min-width: 100% !important;
+            flex: 1 1 100% !important;
+        }
+
+        .block-container {
+            padding-left: 12px !important;
+            padding-right: 12px !important;
         }
     }
 
-    /* Small phones: stack anything laid out as side-by-side
-       columns (category/difficulty selects, hint/give-up, sidebar
-       nav pairs, category cards) into a single column instead of
-       squeezing them, so nothing gets clipped or unreadable. */
-
     @media (max-width: 480px) {
 
-        /* Stack side-by-side controls (category/difficulty select,
-           hint/give-up, sidebar nav pairs, stats metrics) into a
-           single column so nothing gets clipped on tiny screens. */
+        /* The HUD caption + hearts share a row on desktop; on a
+           phone they wrap so the hearts never get cut off. */
+        .hud-row { flex-wrap: wrap; row-gap: 2px; }
+
+        div[class*="st-key-arena_hud"] { min-height: 96px; }
+
+        div[class*="st-key-word_row"] .stButton > button {
+            min-height: 32px !important;
+            font-size: 14px !important;
+            border-radius: 8px !important;
+        }
+
+        div[class*="st-key-kbd_panel"] [data-testid^="stBaseButton-"],
+        div[class*="st-key-kbd_panel"] button[kind] {
+            min-height: 34px !important;
+            font-size: 11px !important;
+            border-radius: 7px !important;
+        }
+
+        /* Squeeze the tile grids' own gutters so each key/letter
+           gets as much width as possible on narrow screens. */
+        div[class*="st-key-kbd_panel"] div[data-testid="stHorizontalBlock"],
+        div[class*="st-key-word_row"] div[data-testid="stHorizontalBlock"] {
+            flex-wrap: nowrap !important;
+            gap: 3px !important;
+        }
+
+        div[class*="st-key-kbd_panel"] div[data-testid="stColumn"],
+        div[class*="st-key-word_row"] div[data-testid="stColumn"] {
+            min-width: 0 !important;
+            flex: 1 1 0 !important;
+        }
+
+        /* Stack side-by-side controls (category/difficulty, hint /
+           give-up, category cards, settings rows) into a single
+           column so nothing gets clipped on tiny screens. */
         div[data-testid="stHorizontalBlock"] {
             flex-wrap: wrap !important;
             row-gap: 10px;
@@ -1388,26 +1644,34 @@ st.markdown(
             flex: 1 1 100% !important;
         }
 
-        /* ...but NOT the keyboard grid or the word-letter row —
-           those must stay as a fixed grid of many small tiles,
-           not stack one-per-line, or the game becomes unusable. */
-        div[class*="st-key-kbd_panel"] div[data-testid="stHorizontalBlock"],
-        div[class*="st-key-word_row"] div[data-testid="stHorizontalBlock"] {
-            flex-wrap: nowrap !important;
+        /* ...but the Stats KPI cards make a nicer 2x2 grid than
+           four full-width stacked cards. */
+        div[class*="st-key-stats_kpis"] div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
+            min-width: 50% !important;
+            flex: 1 1 50% !important;
         }
 
-        div[class*="st-key-kbd_panel"] div[data-testid="stColumn"],
-        div[class*="st-key-word_row"] div[data-testid="stColumn"] {
-            min-width: 0 !important;
-            flex: 1 1 0 !important;
-        }
+        .app-name h1 { font-size: 20px; letter-spacing: 1px; }
+        .app-name p { font-size: 7px; letter-spacing: 2px; }
+        .panel-title { font-size: 17px; }
+        .section-title { font-size: 19px; }
 
-        .block-container {
-            padding-left: 12px !important;
-            padding-right: 12px !important;
-        }
+        /* Android <=360px: real small-screen compaction. */
+        @media (max-width: 360px) {
+            div[class*="st-key-word_row"] .stButton > button {
+                min-height: 28px !important;
+                font-size: 12px !important;
+                padding: 0 1px !important;
+            }
 
-        div[class*="st-key-kbd_row_"] { row-gap: 4px; }
+            div[class*="st-key-kbd_panel"] [data-testid^="stBaseButton-"],
+            div[class*="st-key-kbd_panel"] button[kind] {
+                min-height: 30px !important;
+                font-size: 10px !important;
+            }
+
+            .heart-full, .heart-empty { font-size: 12px; }
+        }
     }
 
     </style>
@@ -1444,12 +1708,18 @@ with st.sidebar:
     logo_path = ASSETS / "logo.png"
 
     if logo_path.exists():
-        st.image(str(logo_path), use_container_width=True)
+        with st.container(horizontal_alignment="center"):
+            st.image(str(logo_path), width=150)
     else:
         st.markdown("# VENOM")
 
     with st.container(key="sidebar_cta"):
-        if st.button("🎮  NEW GAME", use_container_width=True, key="new_game_side"):
+        if st.button(
+            "NEW GAME",
+            icon=":material/sports_esports:",
+            width="stretch",
+            key="new_game_side",
+        ):
             start_new_game()
             st.session_state.page = "game"
             st.rerun()
@@ -1458,18 +1728,33 @@ with st.sidebar:
 
     with nav1:
         with st.container(key="nav_category"):
-            if st.button("▦ CATEGORY", use_container_width=True):
+            if st.button(
+                "CATEGORY",
+                icon=":material/category:",
+                width="stretch",
+                key="navbtn_category",
+            ):
                 st.session_state.page = "category"
                 st.rerun()
 
     with nav2:
         with st.container(key="nav_stats"):
-            if st.button("◢ STATS", use_container_width=True):
+            if st.button(
+                "STATS",
+                icon=":material/query_stats:",
+                width="stretch",
+                key="navbtn_stats",
+            ):
                 st.session_state.page = "stats"
                 st.rerun()
 
     with st.container(key="nav_settings"):
-        if st.button("⚙ SETTINGS", use_container_width=True):
+        if st.button(
+            "SETTINGS",
+            icon=":material/settings:",
+            width="stretch",
+            key="navbtn_settings",
+        ):
             st.session_state.page = "settings"
             st.rerun()
 
@@ -1486,29 +1771,23 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
-    st.metric("Games Played", games)
-    st.metric("Games Won", wins)
-    st.metric("Win Rate", f"{win_rate}%")
-    st.metric("Current Streak", st.session_state.current_streak)
-    st.metric("Best Streak", st.session_state.best_streak)
+    m1, m2 = st.columns(2)
+    with m1:
+        st.metric("Games Played", games, border=True)
+        st.metric("Win Rate", f"{win_rate}%", border=True)
+    with m2:
+        st.metric("Games Won", wins, border=True)
+        st.metric("Streak", st.session_state.current_streak, border=True)
 
-    badges = get_achievements()
-    if badges:
-        st.markdown(
-            '<div class="side-panel"><div class="small-green">ACHIEVEMENTS</div></div>',
-            unsafe_allow_html=True,
-        )
-        for badge in badges:
-            st.caption(badge)
+    st.caption(
+        f":material/local_fire_department: Best streak: {st.session_state.best_streak}"
+    )
+    st.caption(
+        f":material/{'volume_up' if st.session_state.sound_on else 'volume_off'}: "
+        f"Sound {'on' if st.session_state.sound_on else 'off'}"
+    )
 
     st.markdown("---")
-
-    if st.button(
-        "🔊 SOUND ON" if st.session_state.sound_on else "🔇 SOUND OFF",
-        use_container_width=True,
-    ):
-        toggle_sound()
-        st.rerun()
 
     st.markdown(
         """
@@ -1534,7 +1813,14 @@ if st.session_state.page == "category":
 
     render_header("HANGMAN", "CATEGORY SELECTOR")
 
-    st.subheader("Choose a category")
+    st.markdown(
+        '<div class="section-title">CHOOSE YOUR PREY</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<div class="section-hint">PICK A CATEGORY BEFORE THE SYMBIOTE PICKS YOU</div>',
+        unsafe_allow_html=True,
+    )
 
     cat_list = list(WORD_BANK.keys())
 
@@ -1545,12 +1831,13 @@ if st.session_state.page == "category":
         for col, category in zip(cols, row_categories):
             with col:
                 with st.container(key=f"cat_card_{category}"):
-                    icon = CATEGORY_ICONS.get(category, "🔤")
+                    icon = CATEGORY_ICONS.get(category, ":material/abc:")
                     is_active = category == st.session_state.category
 
                     if st.button(
-                        f"{icon}  {category.upper()}",
-                        use_container_width=True,
+                        category.upper(),
+                        icon=icon,
+                        width="stretch",
                         key=f"catbtn_{category}",
                     ):
                         start_new_game(category=category)
@@ -1575,34 +1862,79 @@ if st.session_state.page == "stats":
 
     render_header("STATS", "YOUR HANGMAN RECORD")
 
-    a, b, c = st.columns(3)
+    st.markdown(
+        '<div class="section-title">SYMBIOTE STATS</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<div class="section-hint">THE VENOM INSIDE KEEPS SCORE</div>',
+        unsafe_allow_html=True,
+    )
 
-    with a:
-        st.metric("Games Played", st.session_state.games_played)
+    win_rate = (
+        round(st.session_state.games_won * 100 / st.session_state.games_played)
+        if st.session_state.games_played
+        else 0
+    )
 
-    with b:
-        st.metric("Games Won", st.session_state.games_won)
+    with st.container(key="stats_kpis"):
+        m_cols = st.columns(4)
+        with m_cols[0]:
+            st.metric(
+                "Games Played",
+                st.session_state.games_played,
+                icon=":material/sports_esports:",
+                border=True,
+            )
+        with m_cols[1]:
+            st.metric(
+                "Games Won",
+                st.session_state.games_won,
+                icon=":material/trophy:",
+                border=True,
+            )
+        with m_cols[2]:
+            st.metric(
+                "Win Rate",
+                f"{win_rate}%",
+                icon=":material/trending_up:",
+                border=True,
+            )
+        with m_cols[3]:
+            st.metric(
+                "Best Streak",
+                st.session_state.best_streak,
+                icon=":material/local_fire_department:",
+                border=True,
+            )
 
-    with c:
-        win_rate = (
-            round(st.session_state.games_won * 100 / st.session_state.games_played)
-            if st.session_state.games_played
-            else 0
-        )
-        st.metric("Win Rate", f"{win_rate}%")
+    st.metric(
+        "Current Streak",
+        st.session_state.current_streak,
+        icon=":material/timeline:",
+        border=True,
+    )
 
-    st.metric("Current Streak", st.session_state.current_streak)
-    st.metric("Best Streak", st.session_state.best_streak)
+    st.markdown(
+        '<div class="panel-title" style="font-size:20px;">ACHIEVEMENTS</div>',
+        unsafe_allow_html=True,
+    )
 
-    badges = get_achievements()
-    if badges:
-        st.markdown("**Achievements**")
-        for badge in badges:
-            st.write(badge)
+    defs = get_achievement_defs()
+    if any(d["unlocked"] for d in defs):
+        for d in defs:
+            if d["unlocked"]:
+                st.badge(
+                    f"{d['label']} — {d['detail']}",
+                    icon=f":material/{d['icon']}:",
+                    color=d["color"],
+                )
+            else:
+                st.caption(f":material/help: {d['label']} — {d['detail']} (locked)")
     else:
         st.caption("No achievements unlocked yet — win a few rounds to start earning badges.")
 
-    if st.button("← BACK TO GAME", use_container_width=True):
+    if st.button("← BACK TO GAME", width="stretch"):
         st.session_state.page = "game"
         st.rerun()
 
@@ -1613,17 +1945,63 @@ if st.session_state.page == "settings":
 
     render_header("SETTINGS", "GAME PREFERENCES")
 
-    st.selectbox(
-        "DIFFICULTY",
-        list(DIFFICULTY_ATTEMPTS.keys()),
-        key="difficulty",
-        on_change=on_difficulty_change,
+    st.markdown(
+        '<div class="section-title">SYMBIOTE CONFIG</div>',
+        unsafe_allow_html=True,
     )
-    st.caption(f"{DIFFICULTY_ATTEMPTS[st.session_state.difficulty]} attempts allowed before Venom wins.")
+    st.markdown(
+        '<div class="section-hint">TUNE THE HOST BEFORE THE FIGHT</div>',
+        unsafe_allow_html=True,
+    )
 
-    st.write(f"Sound: {'On' if st.session_state.sound_on else 'Off'}")
+    with st.container(key="settings_panel", border=True):
 
-    if st.button("← BACK TO GAME", use_container_width=True):
+        st.markdown(
+            '<div class="hud-caption">DIFFICULTY</div>',
+            unsafe_allow_html=True,
+        )
+        st.segmented_control(
+            "Difficulty",
+            list(DIFFICULTY_ATTEMPTS.keys()),
+            key="difficulty",
+            on_change=on_difficulty_change,
+            label_visibility="collapsed",
+            width="stretch",
+        )
+        st.caption(
+            f"{DIFFICULTY_ATTEMPTS[st.session_state.difficulty]} attempts before Venom wins. "
+            "Changing difficulty starts a fresh round."
+        )
+
+        st.write("")
+
+        st.markdown(
+            '<div class="hud-caption">SOUND</div>',
+            unsafe_allow_html=True,
+        )
+        st.toggle("Sound effects", key="sound_on")
+        st.caption("Eerie tones, dings and cackles for each round.")
+
+    if st.session_state.sound_on:
+        st.badge("Sound on", icon=":material/volume_up:", color="green")
+    else:
+        st.badge("Sound off", icon=":material/volume_off:", color="gray")
+
+    st.markdown(
+        f'''
+        <div class="side-panel">
+            <div class="small-green">CURRENT SETUP</div>
+        </div>
+        ''',
+        unsafe_allow_html=True,
+    )
+    st.caption(
+        f"Category: **{st.session_state.category}**  ·  "
+        f"Difficulty: **{st.session_state.difficulty}**  ·  "
+        f"Attempts: **{DIFFICULTY_ATTEMPTS[st.session_state.difficulty]}**"
+    )
+
+    if st.button("← BACK TO GAME", width="stretch"):
         st.session_state.page = "game"
         st.rerun()
 
@@ -1644,21 +2022,29 @@ cat_col, diff_col = st.columns(2)
 categories = list(WORD_BANK.keys())
 difficulties = list(DIFFICULTY_ATTEMPTS.keys())
 
-with cat_col:
-    st.selectbox(
-        "CATEGORY",
-        categories,
-        key="category",
-        on_change=on_category_change,
-    )
+with st.container(key="top_controls"):
+    cat_col, diff_col = st.columns(2, vertical_alignment="center")
 
-with diff_col:
-    st.selectbox(
-        "DIFFICULTY",
-        difficulties,
-        key="difficulty",
-        on_change=on_difficulty_change,
-    )
+    with cat_col:
+        st.pills(
+            "Category",
+            categories,
+            key="category",
+            on_change=on_category_change,
+            label_visibility="collapsed",
+            width="stretch",
+            wrap=True,
+        )
+
+    with diff_col:
+        st.segmented_control(
+            "Difficulty",
+            difficulties,
+            key="difficulty",
+            on_change=on_difficulty_change,
+            label_visibility="collapsed",
+            width="stretch",
+        )
 
 st.markdown(
     '<div class="panel-title">GUESS THE WORD</div>',
@@ -1707,7 +2093,7 @@ with st.container(key="arena_hud"):
                     visible,
                     key=f"word_display_{i}",
                     disabled=True,
-                    use_container_width=True,
+                    width="stretch",
                 )
 
 
@@ -1765,7 +2151,7 @@ with st.container(key="kbd_panel"):
                         key=f"key_{letter}",
                         type=btn_type,
                         disabled=already_used or st.session_state.game_over,
-                        use_container_width=True,
+                        width="stretch",
                     ):
                         guess_letter(letter)
                         st.rerun()
@@ -1783,7 +2169,7 @@ with action_hint:
                 st.session_state.game_over
                 or st.session_state.hints_left <= 0
             ),
-            use_container_width=True,
+            width="stretch",
         ):
             use_hint()
             st.rerun()
@@ -1793,7 +2179,7 @@ with action_giveup:
         if st.button(
             "☠ GIVE UP",
             disabled=st.session_state.game_over,
-            use_container_width=True,
+            width="stretch",
         ):
             give_up()
             st.rerun()
